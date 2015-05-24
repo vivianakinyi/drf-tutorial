@@ -10,6 +10,8 @@ from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework import renderers
 from rest_framework.response import Response
+from rest_framework import viewsets
+from rest_framework.decorators import detail_route
 
 
 #Creating an endpoint for the root of our API
@@ -20,38 +22,62 @@ def api_root(request, format=None):
         'snippets': reverse('snippet-list', request=request, format=format)
     })
 
-
-class SnippetList(generics.ListCreateAPIView):
-    queryset = Snippet.objects.all()
-    serializer_class = SnippetSerializer
-    permission_classes = (permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly,)
-    #Added a .perform_create() method to associate snippet with users.
-    def perform_create(self, serializer):
-    	serializer.save(owner=self.request.user)
+#The UserList and UserDetail is refactored to one single viewset Userviewset below
+#**********************************************************************************
+# class UserList(generics.ListAPIView):
+#     queryset = User.objects.all()
+#     serializer_class = UserSerializer
 
 
-class SnippetDetail(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Snippet.objects.all()
-    serializer_class = SnippetSerializer
-    permission_classes = (permissions.IsAuthenticatedOrReadOnly,)
+# class UserDetail(generics.RetrieveAPIView):
+#     queryset = User.objects.all()
+#     serializer_class = UserSerializer
 
-class UserList(generics.ListAPIView):
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
+#The refactored class UserViewset 
+class UserViewSet(viewsets.ReadOnlyModelViewSet):
+	"""This automatically provides list and detail action"""
+	queryset = User.objects.all()
+	serializer_class = UserSerializer
+
+#This viewset automatically provides CRUD actions and an extra highlight action
+class SnippetViewSet(viewsets.ModelViewSet):
+	queryset = Snippet.objects.all()
+	serializer_class = SnippetSerializer
+	permission_classes = (permissions.IsAuthenticatedOrReadOnly,IsOwnerOrReadOnly,)
+
+	@detail_route(renderer_classes=[renderers.StaticHTMLRenderer])
+	def highlight(self, request, *args, **kwargs):
+		snippet = self.get_object()
+		return Response(snippet.highlighted)
+
+	def perform_create(self, serializer):
+		serilaizer.save(owner=self.request.user)
 
 
-class UserDetail(generics.RetrieveAPIView):
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
+#The SnippetList SnippetDetail and SnippetHighlight classes are then refactored to a single class SnippetViewSet above
+#**********************************************************************************************************************
+# class SnippetList(generics.ListCreateAPIView):
+#     queryset = Snippet.objects.all()
+#     serializer_class = SnippetSerializer
+#     permission_classes = (permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly,)
+#     #Added a .perform_create() method to associate snippet with users.
+#     def perform_create(self, serializer):
+#     	serializer.save(owner=self.request.user)
 
-#Endpoints for the highlighted snippets
-class SnippetHighlight(generics.GenericAPIView):
-    queryset = Snippet.objects.all()
-    renderer_classes = (renderers.StaticHTMLRenderer,)
 
-    def get(self, request, *args, **kwargs):
-        snippet = self.get_object()
-        return Response(snippet.highlighted)
+# class SnippetDetail(generics.RetrieveUpdateDestroyAPIView):
+#     queryset = Snippet.objects.all()
+#     serializer_class = SnippetSerializer
+#     permission_classes = (permissions.IsAuthenticatedOrReadOnly,)
+
+# 	#Endpoints for the highlighted snippets
+# class SnippetHighlight(generics.GenericAPIView):
+#     queryset = Snippet.objects.all()
+#     renderer_classes = (renderers.StaticHTMLRenderer,)
+
+#     def get(self, request, *args, **kwargs):
+#         snippet = self.get_object()
+#         return Response(snippet.highlighted)
 
 #Class based views with mixins
 
